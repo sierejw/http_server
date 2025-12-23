@@ -10,64 +10,31 @@
 #include <signal.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include "http.h"
+#include "server.h"
 
-#define PORT "3490"
-#define BACKLOG 5
+#define BUFFSIZ 1024
 
 void sigchld_handler(int socket);
 void* get_in_addr(struct sockaddr* sa);
 
-int main(void)
+int main(int argc, char* argv[])
 {
-    int status, sock, con_sock;
-    struct addrinfo hints,* servinfo,* p;
+    if (argc != 2) {
+        fprintf(stderr, "usage: main portnum\n");
+        exit(EXIT_FAILURE);
+    }
+
+    int sock, con_sock;
     struct sockaddr_storage client_addr;
     socklen_t client_addrsize;
-    int yes = 1;
     struct sigaction sa;
     char s[INET6_ADDRSTRLEN];
+    char buf[BUFFSIZ];
+    struct response resp;
+    int resp_len;
 
-    memset(&hints, 0, sizeof hints);    // empty struct
-    hints.ai_family = AF_UNSPEC;        // IPv4 or v6
-    hints.ai_socktype = SOCK_STREAM;    // TCP stream sockets
-    hints.ai_flags = AI_PASSIVE;        // wild card the ip
-
-    if ((status = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
-        fprintf(stderr, "getaddrinfo: %s", gai_strerror(status));
-        exit(EXIT_FAILURE);
-    }
-
-    for (p = servinfo; p != NULL; p = p->ai_next) {
-        if ((sock = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
-            perror("socket");
-            continue;
-        }
-
-       if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-            perror("setsockopt");
-            exit(EXIT_FAILURE);
-       } 
-
-       if (bind(sock, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
-            close(sock);
-            perror("server: bind");
-            continue;
-       }
-
-       break;
-    }
-
-    freeaddrinfo(servinfo);
-
-    if (p == NULL) {
-        fprintf(stderr, "server: failed to bind\n");
-        exit(EXIT_FAILURE);
-    }
-   
-    if (listen(sock, BACKLOG) == -1) {
-        perror("listen");
-        exit(EXIT_FAILURE);
-    }
+    sock = setup_server(argv[1]);
 
     sa.sa_handler = sigchld_handler;
     sigemptyset(&sa.sa_mask);
@@ -91,8 +58,16 @@ int main(void)
 
         if (!fork()) {
             close(sock);
-            if (send(con_sock, "Hello, world!", 13, 0) == -1)
+
+            if (recv(con_sock, buf, BUFFSIZ, 0) == -1)
+                perror("recv");
+
+            construct_response(&resp, buf, resp_len);
+                
+            if (send(con_sock, "HTTP/1.0 200 OK\r\n\r\n<h1> Hello, world! </h1>", 43, 0) == -1)
                 perror("send");
+            
+            printf("%s", buf);
             close(con_sock);
             exit(EXIT_SUCCESS);
         }
