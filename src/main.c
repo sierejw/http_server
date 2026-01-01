@@ -58,20 +58,27 @@ int main(int argc, char* argv[])
 
         if (!fork()) {
             close(sock);
-
             if (recv(con_sock, buf, BUFFSIZ, 0) == -1)
                 perror("recv");
-
             construct_response(&resp, buf, resp_len);
-                
-            if (send(con_sock, "HTTP/1.0 200 OK\r\n\r\n<h1> Hello, world! </h1>", 43, 0) == -1)
+            char response_buf[100] = {0};
+            snprintf(response_buf, sizeof(response_buf), "HTTP/%.1f %d %s\r\n\r\n%s", resp.ver, resp.status, resp.reason, resp.message);
+            printf("%s", response_buf);
+            char* p = response_buf;
+            int size = 0;
+            /*if (strchr(p, '\0')) {
+                printf("yes\n");
+            }*/
+            while (*p != '\0'){
+                size++;
+                p++;
+            }
+            if (send(con_sock, response_buf, size, 0) == -1)
                 perror("send");
             
-            printf("%s", buf);
             close(con_sock);
             exit(EXIT_SUCCESS);
         }
-
         close(con_sock);
     }
 

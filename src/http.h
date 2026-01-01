@@ -1,8 +1,9 @@
 #pragma once
 
 struct response {
-    int ver;
+    float ver;
     int status;
+    char* reason;
     char* message;
 };
 
