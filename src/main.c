@@ -60,19 +60,16 @@ int main(int argc, char* argv[])
             close(sock);
             if (recv(con_sock, buf, BUFFSIZ, 0) == -1)
                 perror("recv");
+            
+            printf("%s", buf);
             construct_response(&resp, buf, resp_len);
+            printf("good bye");
             char response_buf[100] = {0};
             snprintf(response_buf, sizeof(response_buf), "HTTP/%.1f %d %s\r\n\r\n%s", resp.ver, resp.status, resp.reason, resp.message);
             printf("%s", response_buf);
             char* p = response_buf;
-            int size = 0;
-            /*if (strchr(p, '\0')) {
-                printf("yes\n");
-            }*/
-            while (*p != '\0'){
-                size++;
-                p++;
-            }
+            size_t size = strlen(response_buf);
+            
             if (send(con_sock, response_buf, size, 0) == -1)
                 perror("send");
             
